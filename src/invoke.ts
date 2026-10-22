@@ -52,10 +52,10 @@ import {
   buildInitialEnvelope,
   describeSimulationResources,
   describeSubmissionFailure,
-  INCLUSION_FEE,
   isMinimumFeeBroadcastFailure,
   isSequenceNumberFailure,
   isStaleLedgerResourceFailure,
+  parseInclusionFee,
   parseSimulationResourceFee,
   signAccountAuthEntry,
   summarizeDiagnosticEvents,
@@ -516,7 +516,9 @@ export interface InvokeParams {
    */
   maxRetries?: number | undefined;
   /** Custom inclusion fee (used internally during fee-bump retries). */
-  fee?: bigint | string | undefined;
+  fee?: bigint | string | number | null | undefined;
+  /** Configurable inclusion fee in stroops for assembled transactions and dry-run estimates. */
+  inclusionFee?: bigint | string | number | null | undefined;
   /**
    * Caller-owned cancellation. When aborted, the pipeline stops at the next
    * RPC boundary and `invoke()` returns its `error` outcome carrying an
@@ -882,10 +884,14 @@ function resolveFeeBumpOptions(params: InvokeParams): {
 } {
   const requested = params.feeBump?.maxAttempts ?? 3;
   const overall = params.maxRetries !== undefined ? params.maxRetries + 1 : Number.POSITIVE_INFINITY;
+  const initialInclusionFee =
+    params.feeBump?.initialInclusionFee !== undefined
+      ? params.feeBump.initialInclusionFee
+      : parseInclusionFee(params.inclusionFee ?? params.fee);
   return {
     maxAttempts: Math.max(1, Math.min(requested, overall)),
     feeMultiplier: params.feeBump?.feeMultiplier ?? 2,
-    initialInclusionFee: params.feeBump?.initialInclusionFee ?? BigInt(INCLUSION_FEE),
+    initialInclusionFee,
   };
 }
 
@@ -1685,7 +1691,7 @@ async function invokeDryRun(
   const feesStartedAt = performance.now();
   const fees: FeeBreakdown =
     verdict === "admissible"
-      ? feeBreakdown(resourceFee)
+      ? feeBreakdown(resourceFee, params.inclusionFee ?? params.fee)
       : {
           resourceFeeStroops: 0n,
           inclusionFeeStroops: 0n,
@@ -1759,7 +1765,9 @@ async function invokePipeline(
   const enforced = await enforceCall(
     {
       ...params,
-      ...(options?.inclusionFee !== undefined ? { fee: options.inclusionFee } : {}),
+      ...(options?.inclusionFee !== undefined
+        ? { inclusionFee: options.inclusionFee, fee: options.inclusionFee }
+        : {}),
     },
     attempt,
     { deadline: options?.deadline, clock: options?.clock },
@@ -1793,7 +1801,7 @@ async function invokePipeline(
       operation: enforced.operation,
       networkPassphrase: params.networkPassphrase,
       guard: params.guardAuth?.guard ?? null,
-      ...(options?.inclusionFee !== undefined ? { inclusionFee: options.inclusionFee } : {}),
+      inclusionFee: options?.inclusionFee ?? params.inclusionFee ?? params.fee,
     });
   } catch (cause) {
     // The enforced simulation passed, so a failure to turn its result into a
@@ -2002,7 +2010,7 @@ export async function enforceCall(
       operation,
       networkPassphrase,
       guard: params.guardAuth?.guard ?? null,
-      fee: params.fee,
+      inclusionFee: params.inclusionFee ?? params.fee,
     });
     first = await withStepTiming(
       onStep,
@@ -2226,7 +2234,7 @@ export async function enforceCall(
           operation: authorized,
           networkPassphrase,
           guard: params.guardAuth?.guard ?? null,
-          fee: params.fee,
+          inclusionFee: params.inclusionFee ?? params.fee,
         });
         return { operation: authorized, response: await server.simulateTransaction(enforcingTx) };
       },
