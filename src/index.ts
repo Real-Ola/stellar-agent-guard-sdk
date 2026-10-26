@@ -26,6 +26,7 @@ export {
   BroadcastError,
   ContractResponseError,
   GuardError,
+  GuardUndeterminedError,
   InvalidFeeCeilingError,
   InvalidInputError,
   PolicyDecodeError,
@@ -33,6 +34,7 @@ export {
   PolicyFileReadError,
   PolicyValidationError,
   SigningError,
+  RateLimitedError,
   SimulationError,
 } from "./errors.ts";
 
@@ -65,6 +67,7 @@ export type {
 } from "./reasons.ts";
 
 export {
+  DEFAULT_GUARD_POLICY,
   POLICY_RULE_IDS,
   deadManRemaining,
   decodeCheckResult,
@@ -78,6 +81,7 @@ export {
   isDeadManFrozen,
   isPublicKeyHex,
   isStrKeyAddress,
+  policyAddressComparisonKey,
   policyFromScVal,
   policyToScVal,
   readPersistentEntry,
@@ -183,8 +187,10 @@ export {
   type InvokeErrorOutcome,
   type InvokeOptions,
   type InvokeOutcome,
-  type InvokePipelineStep,
   type InvokeParams,
+  type InvokeParamsInput,
+  type InvokePendingOutcome,
+  type InvokePipelineStep,
   type InvokeRetryAttempt,
   type InvokeRetryMetadata,
   type InvokeStepEvent,
@@ -192,13 +198,23 @@ export {
   type SubmissionAcceptedEvent,
 } from "./invoke.ts";
 
+export { resolveRpcServer } from "./transport.ts";
+
+export type {
+  RpcServerTransport,
+  RpcTransportConfig,
+  RpcUrlTransport,
+  WithRpcTransport,
+} from "./transport.ts";
+
 export { TRACE_STEP_NAMES } from "./trace.ts";
 
 export type { TraceStepName, TraceStepStatus } from "./trace.ts";
 
 export {
+  GuardUndeterminedError as PreFlightUndeterminedError,
+  DEFAULT_MAX_CONCURRENT_SIMULATIONS,
   PreFlightInterceptor,
-  PreFlightUndeterminedError,
   preflight,
   preflightBatch,
   validateContractCall,
@@ -213,8 +229,10 @@ export type {
   PreFlightCacheOptions,
   PreFlightCheckOptions,
   PreFlightConfig,
+  PreFlightConfigInput,
   PreFlightDecision,
   PreFlightInterceptorOptions,
+  PreFlightUndeterminedCause,
 } from "./preflight.ts";
 
 export {
@@ -282,6 +300,7 @@ export {
   type GuardEventRecord,
   type GuardEventStream,
   type GuardTelemetryConfig,
+  type GuardTelemetryInputConfig,
   type GuardTelemetryCoverage,
   type GuardTelemetryCoverageStatus,
   type GuardTelemetryGap,
@@ -358,12 +377,16 @@ export {
   HeartbeatBlockedError,
   HeartbeatDryRunError,
   HeartbeatIntervalError,
+  heartbeat,
   isRetryableHeartbeatFailure,
+  readGuardStatus,
   startHeartbeat,
   submitHeartbeat,
   type HeartbeatBeat,
   type HeartbeatHandle,
   type HeartbeatOptions,
+  type HeartbeatParams,
+  type HeartbeatResult,
   type HeartbeatRetryOptions,
   type HeartbeatStopOptions,
   type HeartbeatStopResult,
